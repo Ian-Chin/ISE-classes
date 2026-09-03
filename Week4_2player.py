@@ -1,10 +1,19 @@
 """
-Week 4: Imaging and Special Effects - Working with Animation
+Week 4 (two player version): the turtle hurdles race, but lane 1 and lane 2 are
+both driven by a human. Lanes 3 and 4 stay under AI control.
+
+All four turtles are still cut out of the same sprite sheet with Pillow - the
+rivals are the same frames put through a hue rotation.
+
+Controls:
+    Player 1 : LEFT / RIGHT run, UP or SPACE jump, RIGHT SHIFT sprint
+    Player 2 : A / D run, W jump, LEFT SHIFT sprint
+    R        : race again
+    ESC      : quit
 """
 
 import math
 import random
-import sys
 from pathlib import Path
 
 import arcade
@@ -20,142 +29,9 @@ ROW_COUNT = 2
 COLUMN_COUNT = 4
 FRAME_COUNT = ROW_COUNT * COLUMN_COUNT
 
-colorModes = {
-    "1": "Black and White (1-bit)",
-    "L": "Grayscale (8-bit)",
-    "P": "Palette-based",
-    "RGB": "RGB Color",
-    "RGBA": "RGB Color + Alpha",
-    "CMYK": "CMYK Color",
-    "YCbCr": "YCbCr Color",
-    "I": "32-bit Integer",
-    "F": "32-bit Floating Point",
-}
-
-def printImageInfo(img):
-    """
-    Print the resolution, colour mode, channel count and format of a Pillow image,
-    then dump a 3x3 block of pixel values taken from the middle of the image.
-    Shared by Task 1, Task 2 and the exercise so the code is written only once.
-    """
-    width = img.width
-    height = img.height
-
-    print(f"Resolution: {width} X {height} pixels")
-    print(f"Total number of pixel: {width * height} pixels")
-    print(f"Color mode: {img.mode} ->({colorModes.get(img.mode, 'Unknown')})")
-    print(f"Color channels: {len(img.getbands())}")
-    print(f"Format: {img.format}")
-
-    # Sample a small 3x3 patch from the centre of the image
-    startRow = int(height / 2)
-    startCol = int(width / 2)
-
-    for y in range(min(startRow, height), startRow + 3):
-        for x in range(min(startCol, width), startCol + 3):
-            pixel = img.getpixel((x, y))
-            print(f"{pixel} ", end="")
-        print()
-
 
 # --------------------------------------------------------------------------------------
-# Task 1: Understand the image
-# --------------------------------------------------------------------------------------
-def task1():
-    """Open the turtle sheet with Pillow, report its properties and preview it."""
-    img = Image.open(IMAGE_PATH)
-    printImageInfo(img)
-    img.show()
-
-
-# --------------------------------------------------------------------------------------
-# Task 2: Do the same thing with Arcade, and draw the image as a sprite
-# --------------------------------------------------------------------------------------
-class Task2Window(arcade.Window):
-    """Arcade window that reports the image details and shows the whole sheet centred."""
-
-    def __init__(self):
-        super().__init__(SCREEN_WIDTH, SCREEN_HEIGHT, "Working with Pillow")
-
-        # Inspect the file with Pillow before handing it to Arcade
-        img = Image.open(IMAGE_PATH)
-        printImageInfo(img)
-        img.close()
-
-        # Load the same file as a sprite and park it in the middle of the screen
-        self.sprite = arcade.Sprite(IMAGE_PATH)
-        self.sprite.center_x = SCREEN_WIDTH // 2
-        self.sprite.center_y = SCREEN_HEIGHT // 2
-
-        self.spriteList = arcade.SpriteList()
-        self.spriteList.append(self.sprite)
-
-    def on_draw(self):
-        self.clear()
-        self.spriteList.draw()
-
-
-# --------------------------------------------------------------------------------------
-# Task 3: Create a sprite animation from the sheet
-# --------------------------------------------------------------------------------------
-class Task3Window(arcade.Window):
-    """Slice the sheet with arcade.load_spritesheet and loop through the frames."""
-    
-
-    def __init__(self):
-        super().__init__(SCREEN_WIDTH, SCREEN_HEIGHT, "Sprite Animation")
-
-        # Work out the size of one character from the size of the whole sheet
-        spriteSheet = arcade.load_spritesheet(IMAGE_PATH)
-        sheetWidth = spriteSheet.image.width
-        sheetHeight = spriteSheet.image.height
-
-        frameWidth = sheetWidth // COLUMN_COUNT
-        frameHeight = sheetHeight // ROW_COUNT
-
-        print(f"Sprite sheet: {sheetWidth} x {sheetHeight}")
-        print(f"Frame size: {frameWidth} x {frameHeight}")
-
-        # Cut the sheet into a grid of textures, one per character
-        self.animationFrames = spriteSheet.get_texture_grid(
-            (frameWidth, frameHeight),
-            COLUMN_COUNT,
-            FRAME_COUNT,
-        )
-
-        # Start on the first frame, centred on screen
-        self.sprite = arcade.Sprite(self.animationFrames[0])
-        self.sprite.center_x = SCREEN_WIDTH // 2
-        self.sprite.center_y = SCREEN_HEIGHT // 2
-
-        self.spriteList = arcade.SpriteList()
-        self.spriteList.append(self.sprite)
-
-        # Animation state: current frame, elapsed time, and how long a frame is held
-        self.currentFrame = 0
-        self.animationTime = 0
-        self.frameDuration = 0.15
-
-    def on_draw(self):
-        self.clear()
-        self.spriteList.draw()
-
-    def on_update(self, deltaTime):
-        self.animationTime += deltaTime
-
-        if self.animationTime >= self.frameDuration:
-            self.animationTime = 0
-            self.currentFrame += 1
-
-            # Wrap back to the first frame once the last one has been shown
-            if self.currentFrame >= len(self.animationFrames):
-                self.currentFrame = 0
-
-            self.sprite.texture = self.animationFrames[self.currentFrame]
-
-
-# --------------------------------------------------------------------------------------
-# Exercise 1: Slice the sheet with Pillow instead of arcade.load_spritesheet (cropping)
+# Cutting the sheet up with Pillow (same helpers as the single player version)
 # --------------------------------------------------------------------------------------
 def cropFramesWithPillow(imagePath, rowCount, columnCount):
 
@@ -223,9 +99,8 @@ def makeTextures(frames, tag, hueShift=0, mirrored=False):
 
 
 # --------------------------------------------------------------------------------------
-# Exercise 2 + 3: Key-driven animation wrapped in a short sport-event narrative
+# Race settings
 # --------------------------------------------------------------------------------------
-
 ANIMATIONS = {
     "idle": [0],
     "walk": [0, 1, 2, 3, 4, 5, 7],
@@ -233,12 +108,10 @@ ANIMATIONS = {
     "stumble": [4, 5],
 }
 
-# Exercise 3: the pre-race commentary. The rest of the story is generated live
-# by the race itself (see Race.say), so no two races are narrated the same way.
 NARRATIVE = [
     "SHELLBOURNE STADIUM - Final of the 100 m Turtle Hurdles.",
-    "Toby 'Tailwind' Turtle is in lane 1, three rivals alongside him.",
-    "The stadium falls silent. The starter raises the gun...",
+    "Toby in lane 1, Shellina in lane 2, and two rivals behind them.",
+    "Two turtles, two sets of controls. The starter raises the gun...",
 ]
 
 # Track layout
@@ -246,7 +119,7 @@ START_X = 90
 FINISH_X = SCREEN_WIDTH - 70
 RACE_DISTANCE = 100  # metres, for the on-screen readout
 LANE_COUNT = 4
-LANE_BOTTOM = 150  # y of the lowest runner's centre
+LANE_BOTTOM = 130  # y of the lowest runner's centre
 LANE_SPACING = 88
 RUNNER_SCALE = 0.42
 SHADOW_DROP = 204 * RUNNER_SCALE / 2  # frame bottom, where the runner's shadow sits
@@ -266,18 +139,30 @@ HURDLE_METRES = [22, 44, 66, 88]
 HURDLE_HEIGHT = 34
 HURDLE_HALF_WIDTH = 23  # how close counts as a clip
 
-BEST_TIME_FILE = Path(__file__).parent / "lab" / "best_time.txt"
+BEST_TIME_FILE = Path(__file__).parent / "lab" / "best_time_2p.txt"
 
-SPRINT_KEYS = frozenset({arcade.key.LSHIFT, arcade.key.RSHIFT})
+# Two control schemes, one per human lane
+PLAYER_ONE_CONTROLS = {
+    "left": {arcade.key.LEFT},
+    "right": {arcade.key.RIGHT},
+    "jump": {arcade.key.UP, arcade.key.SPACE},
+    "sprint": {arcade.key.RSHIFT},
+}
 
-# Runner name and the hue rotation applied to its copy of the sprite sheet.
-# The scoreboard colour is derived from the same rotation, so the name on the
-# result panel always matches the turtle on the track.
+PLAYER_TWO_CONTROLS = {
+    "left": {arcade.key.A},
+    "right": {arcade.key.D},
+    "jump": {arcade.key.W},
+    "sprint": {arcade.key.LSHIFT},
+}
+
+# Runner name, hue rotation, label on the scoreboard, and the control scheme.
+# A control scheme of None means the turtle is driven by the AI.
 RUNNERS = [
-    ("Toby", 0),  # green, the player
-    ("Shellina", 90),  # blue
-    ("Bruno", 190),  # magenta
-    ("Zippy", 268),  # yellow
+    ("Toby", 0, "P1", PLAYER_ONE_CONTROLS),  # green, player 1
+    ("Shellina", 90, "P2", PLAYER_TWO_CONTROLS),  # blue, player 2
+    ("Bruno", 190, "  ", None),  # magenta, AI
+    ("Zippy", 268, "  ", None),  # yellow, AI
 ]
 
 # The green of the turtle's skin, taken from the sprite sheet itself
@@ -287,8 +172,8 @@ TURTLE_GREEN = (70, 205, 100)
 SKY = (120, 195, 235)
 TRACK_LIGHT = (206, 124, 88)
 TRACK_DARK = (188, 108, 74)
-CROWD_BOTTOM = 470
-CROWD_TOP = 536
+CROWD_BOTTOM = 458
+CROWD_TOP = 512
 CROWD_COLORS = [
     (232, 196, 160),
     (196, 148, 112),
@@ -305,6 +190,8 @@ CONFETTI_COLORS = [
     (245, 245, 245),
 ]
 
+HUD_BOTTOM = 522
+
 
 def metresToX(metres):
     return START_X + (metres / RACE_DISTANCE) * (FINISH_X - START_X)
@@ -315,7 +202,7 @@ def ordinal(number):
 
 
 def loadBestTime():
-    """Read the personal best from disk, ignoring a missing or corrupt file."""
+    """Read the best time on this track from disk, ignoring a missing or corrupt file."""
     try:
         return float(BEST_TIME_FILE.read_text().strip())
     except (OSError, ValueError):
@@ -332,13 +219,17 @@ def saveBestTime(seconds):
 class Runner:
     """One turtle in the race: its textures, its lane, and its animation state."""
 
-    def __init__(self, name, lane, color, textures, mirroredTextures, isPlayer):
+    def __init__(self, name, lane, color, textures, mirroredTextures, label, controls):
         self.name = name
         self.lane = lane
         self.color = color
         self.textures = textures
         self.mirroredTextures = mirroredTextures
-        self.isPlayer = isPlayer
+        self.label = label
+
+        # A human runner carries a control scheme, an AI runner does not
+        self.controls = controls
+        self.isHuman = controls is not None
 
         self.baseY = LANE_BOTTOM + lane * LANE_SPACING
         self.sprite = arcade.Sprite(textures[0], scale=RUNNER_SCALE)
@@ -360,6 +251,11 @@ class Runner:
         self.stumbleTime = 0
         self.finishTime = None
         self.place = None
+
+        # Human input state, read fresh every frame from the held keys
+        self.direction = 0  # -1 left, 0 still, +1 right
+        self.sprinting = False
+        self.stamina = MAX_STAMINA
 
         # Each rival gets its own pace and its own surge rhythm, so the race
         # plays out differently every time
@@ -444,6 +340,58 @@ class Runner:
         source = self.textures if self.facingRight else self.mirroredTextures
         self.sprite.texture = source[sequence[self.currentFrame]]
 
+    # ----- human control -------------------------------------------------------------
+    def readHeldKeys(self, heldKeys):
+        """
+        Work out the direction and the sprint from whatever is held right now.
+        Polling instead of reacting to key presses is what lets a player hold
+        their run key through the countdown and still be moving when the gun goes.
+        """
+        right = bool(heldKeys & self.controls["right"])
+        left = bool(heldKeys & self.controls["left"])
+
+        if right and not left:
+            self.direction = 1
+            self.facingRight = True
+        elif left and not right:
+            self.direction = -1
+            self.facingRight = False
+        else:
+            self.direction = 0
+
+        self.sprinting = bool(heldKeys & self.controls["sprint"])
+
+    def updateHuman(self, deltaTime, heldKeys):
+        """One human lane: read the keys, burn or refill stamina, then move."""
+        self.readHeldKeys(heldKeys)
+
+        speed = BASE_SPEED
+        sprinting = self.sprinting and self.direction != 0 and self.stamina > 0
+        emptied = False
+
+        if sprinting:
+            speed *= SPRINT_MULTIPLIER
+            self.stamina = max(0, self.stamina - deltaTime)
+            emptied = self.stamina == 0
+        else:
+            self.stamina = min(MAX_STAMINA, self.stamina + STAMINA_REGEN * deltaTime)
+
+        if self.stumbleTime > 0:
+            speed *= STUMBLE_PENALTY
+
+        self.move(self.direction * speed * deltaTime)
+
+        if self.onGround and self.stumbleTime <= 0:
+            self.setState("walk" if self.direction != 0 else "idle")
+
+        self.updatePhysics(deltaTime)
+
+        ratio = 0 if self.direction == 0 else speed / (BASE_SPEED * SPRINT_MULTIPLIER)
+        self.animate(deltaTime, speedRatio=ratio)
+
+        return emptied
+
+    # ----- AI control ------------------------------------------------------------------
     def updateAi(self, deltaTime, elapsed, hurdleXs):
         """Rival logic: hold a pace, surge now and then, and jump the hurdles."""
         if self.finishTime is not None:
@@ -471,45 +419,34 @@ class Runner:
 
 
 class TurtleSprintGame(arcade.Window):
-    """
-    Exercise 1 + 2 + 3: a four-turtle hurdles race.
-
-    All four runners are drawn from the same sprite sheet - the rivals are the
-    player's frames put through a hue rotation in Pillow.
-
-    Controls:
-        RIGHT / LEFT : run
-        SPACE or UP  : jump the hurdle
-        SHIFT (hold) : sprint, while the stamina bar lasts
-        R            : race again
-        ESC          : quit
-    """
-
+    """Four-turtle hurdles race with two human lanes sharing one keyboard."""
 
     def __init__(self):
-        super().__init__(SCREEN_WIDTH, SCREEN_HEIGHT, "Turtle 100 m Hurdles")
+        super().__init__(SCREEN_WIDTH, SCREEN_HEIGHT, "Turtle 100 m Hurdles - 2 Players")
         self.background_color = SKY
 
-        # Exercise 1: crop the sheet once with Pillow, then dress every runner
-        # from those same frames
+        # Crop the sheet once with Pillow, then dress every runner from those frames
         pilFrames = cropFramesWithPillow(IMAGE_PATH, ROW_COUNT, COLUMN_COUNT)
 
         self.runners = []
         self.spriteList = arcade.SpriteList()
 
-        for lane, (name, hue) in enumerate(RUNNERS):
+        for lane, (name, hue, label, controls) in enumerate(RUNNERS):
             runner = Runner(
                 name,
                 lane,
                 hueShiftedColor(TURTLE_GREEN, hue),
                 makeTextures(pilFrames, name, hue),
                 makeTextures(pilFrames, name, hue, mirrored=True),
-                isPlayer=(lane == 0),
+                label,
+                controls,
             )
             self.runners.append(runner)
             self.spriteList.append(runner.sprite)
 
-        self.player = self.runners[0]
+        # The two human lanes, in scoreboard order
+        self.humans = [runner for runner in self.runners if runner.isHuman]
+
         self.hurdleXs = [metresToX(metres) for metres in HURDLE_METRES]
 
         # A cheap crowd: coloured dots picked once and redrawn every frame
@@ -523,21 +460,34 @@ class TurtleSprintGame(arcade.Window):
         ]
 
         # Text objects are created once and only their .text is updated
-        self.timeText = arcade.Text("", 16, 566, arcade.color.WHITE, 17, bold=True)
-        self.distanceText = arcade.Text("", 200, 566, arcade.color.WHITE, 17)
-        self.placeText = arcade.Text("", 370, 566, arcade.color.WHITE, 17, bold=True)
-        self.bestText = arcade.Text("", 16, 546, (200, 220, 235), 11)
-        self.staminaText = arcade.Text("SPRINT", 560, 568, arcade.color.WHITE, 11)
+        self.timeText = arcade.Text(
+            "", 400, 578, arcade.color.WHITE, 18, bold=True, anchor_x="center"
+        )
+        self.bestText = arcade.Text("", 16, 528, (200, 220, 235), 11)
+
+        # One status line and one stamina bar per human lane
+        self.playerTexts = []
+        self.staminaLabels = []
+        for index, runner in enumerate(self.humans):
+            y = 574 - index * 26
+            self.playerTexts.append(
+                arcade.Text("", 16, y, runner.color, 15, bold=True)
+            )
+            self.staminaLabels.append(
+                arcade.Text(f"{runner.label} SPRINT", 500, y + 1, runner.color, 11)
+            )
+
         self.narrativeText = arcade.Text("", 16, 32, arcade.color.WHITE, 15)
         self.helpText = arcade.Text(
-            "RIGHT run    SPACE jump    SHIFT sprint    R race again    ESC quit",
+            "P1: LEFT/RIGHT run  UP jump  RSHIFT sprint     "
+            "P2: A/D run  W jump  LSHIFT sprint     R again    ESC quit",
             16,
             11,
             (170, 190, 205),
             11,
         )
         self.countdownText = arcade.Text(
-            "", SCREEN_WIDTH // 2, 330, arcade.color.WHITE, 78, bold=True,
+            "", SCREEN_WIDTH // 2, 320, arcade.color.WHITE, 78, bold=True,
             anchor_x="center",
         )
         self.laneTexts = [
@@ -554,20 +504,23 @@ class TurtleSprintGame(arcade.Window):
 
         # Result panel: four rows of three columns, filled in when the race ends
         self.resultTitle = arcade.Text(
-            "RESULT", 400, 383, (235, 200, 60), 22, bold=True, anchor_x="center"
+            "RESULT", 400, 375, (235, 200, 60), 22, bold=True, anchor_x="center"
         )
         self.resultRows = []
         for row in range(LANE_COUNT):
-            y = 340 - row * 30
+            y = 332 - row * 30
             self.resultRows.append(
                 (
-                    arcade.Text("", 254, y, arcade.color.WHITE, 16, bold=True),
-                    arcade.Text("", 300, y, arcade.color.WHITE, 16),
+                    arcade.Text("", 248, y, arcade.color.WHITE, 16, bold=True),
+                    arcade.Text("", 310, y, arcade.color.WHITE, 16),
                     arcade.Text("", 470, y, arcade.color.WHITE, 16),
                 )
             )
+        self.resultWinner = arcade.Text(
+            "", 400, 195, arcade.color.WHITE, 17, bold=True, anchor_x="center"
+        )
         self.resultFooter = arcade.Text(
-            "", 400, 197, arcade.color.WHITE, 14, bold=True, anchor_x="center"
+            "", 400, 172, arcade.color.WHITE, 13, anchor_x="center"
         )
 
         # Keys are polled rather than edge-triggered, so a key that is already
@@ -588,18 +541,18 @@ class TurtleSprintGame(arcade.Window):
         self.countdown = 3.4
         self.raceTime = 0
 
-        self.direction = 0  # -1 left, 0 still, +1 right
-        self.sprinting = False
-        self.stamina = MAX_STAMINA
-
         self.passedHurdles = set()
         self.leader = None
         self.confetti = []
-        self.results = []
         self.newRecord = False
 
         self.sayTimer = 0
         self.narrativeText.text = NARRATIVE[0]
+
+        for placeText, nameText, timeText in self.resultRows:
+            placeText.text = ""
+            nameText.text = ""
+            timeText.text = ""
 
     def say(self, text, hold=2.0, force=False):
         """Post a line of commentary, unless a more recent one is still on screen."""
@@ -607,43 +560,28 @@ class TurtleSprintGame(arcade.Window):
             self.narrativeText.text = text
             self.sayTimer = hold
 
-    # ----- Exercise 2: keyboard control ---------------------------------------------
+    # ----- keyboard -------------------------------------------------------------------
     def on_key_press(self, key, modifiers):
         self.heldKeys.add(key)
 
         if key == arcade.key.ESCAPE:
             self.quitting = True
             self.close()
+            return
 
-        elif key == arcade.key.R:
+        if key == arcade.key.R:
             self.reset()
+            return
 
-        # Jumping is the one action that is a tap, not a hold
-        elif key in (arcade.key.SPACE, arcade.key.UP) and self.state == "racing":
-            self.player.startJump()
+        # Jumping is the one action that is a tap, not a hold, so each human
+        # lane checks the key against its own scheme
+        if self.state == "racing":
+            for runner in self.humans:
+                if key in runner.controls["jump"]:
+                    runner.startJump()
 
     def on_key_release(self, key, modifiers):
         self.heldKeys.discard(key)
-
-    def readHeldKeys(self):
-        """
-        Work out the direction and the sprint from whatever is held right now.
-        Polling instead of reacting to key presses is what lets the player hold
-        RIGHT through the countdown and still be moving the moment the gun goes.
-        """
-        right = arcade.key.RIGHT in self.heldKeys
-        left = arcade.key.LEFT in self.heldKeys
-
-        if right and not left:
-            self.direction = 1
-            self.player.facingRight = True
-        elif left and not right:
-            self.direction = -1
-            self.player.facingRight = False
-        else:
-            self.direction = 0
-
-        self.sprinting = bool(self.heldKeys & SPRINT_KEYS)
 
     # ----- game loop -----------------------------------------------------------------
     def on_update(self, deltaTime):
@@ -660,11 +598,23 @@ class TurtleSprintGame(arcade.Window):
 
         elif self.state == "racing":
             self.raceTime += deltaTime
-            self.updatePlayer(deltaTime)
 
-            for runner in self.runners[1:]:
-                runner.updateAi(deltaTime, self.raceTime, self.hurdleXs)
-                runner.updatePhysics(deltaTime)
+            for runner in self.runners:
+                if runner.isHuman:
+                    # A human who has already crossed the line coasts to a stop
+                    if runner.finishTime is not None:
+                        runner.setState("idle")
+                        runner.updatePhysics(deltaTime)
+                        runner.animate(deltaTime)
+                        continue
+
+                    if runner.updateHuman(deltaTime, self.heldKeys):
+                        self.say(
+                            f"{runner.name} is running on empty - ease off!", force=True
+                        )
+                else:
+                    runner.updateAi(deltaTime, self.raceTime, self.hurdleXs)
+                    runner.updatePhysics(deltaTime)
 
             self.checkHurdles()
             self.checkLead()
@@ -677,46 +627,19 @@ class TurtleSprintGame(arcade.Window):
         self.countdown -= deltaTime
 
         # Read out the pre-race narrative while the starter takes his time.
-        # Leaning on RIGHT during the countdown is allowed - the runner simply
-        # goes the instant the gun fires.
+        # Leaning on a run key during the countdown is allowed - the runner
+        # simply goes the instant the gun fires.
         line = min(int((3.4 - self.countdown) / 1.1), len(NARRATIVE) - 1)
         self.narrativeText.text = NARRATIVE[line]
 
         if self.countdown <= 0:
             self.state = "racing"
             self.countdownText.text = ""
-            self.say("They're away! Hold RIGHT and chase them down!", force=True)
+            self.say("They're away! Two turtles, one finish line!", force=True)
         else:
             self.countdownText.text = "GO!" if self.countdown < 0.4 else str(
                 int(self.countdown)
             )
-
-    def updatePlayer(self, deltaTime):
-        player = self.player
-        self.readHeldKeys()
-
-        speed = BASE_SPEED
-        sprinting = self.sprinting and self.direction != 0 and self.stamina > 0
-
-        if sprinting:
-            speed *= SPRINT_MULTIPLIER
-            self.stamina = max(0, self.stamina - deltaTime)
-            if self.stamina == 0:
-                self.say("Toby is running on empty - ease off and recover!", force=True)
-        else:
-            self.stamina = min(MAX_STAMINA, self.stamina + STAMINA_REGEN * deltaTime)
-
-        if player.stumbleTime > 0:
-            speed *= STUMBLE_PENALTY
-
-        player.move(self.direction * speed * deltaTime)
-
-        if player.onGround and player.stumbleTime <= 0:
-            player.setState("walk" if self.direction != 0 else "idle")
-
-        player.updatePhysics(deltaTime)
-        ratio = 0 if self.direction == 0 else speed / (BASE_SPEED * SPRINT_MULTIPLIER)
-        player.animate(deltaTime, speedRatio=ratio)
 
     def checkHurdles(self):
         """A runner who is not high enough when it reaches a hurdle trips over it."""
@@ -732,13 +655,20 @@ class TurtleSprintGame(arcade.Window):
                 self.passedHurdles.add(key)
 
                 if runner.jumpOffset >= HURDLE_HEIGHT:
-                    if runner.isPlayer:
-                        self.say(f"Clean over hurdle {index + 1}!", hold=1.2)
-                elif runner.isPlayer:
-                    runner.stumble()
-                    self.say(f"He clips hurdle {index + 1}! Toby stumbles!", force=True)
+                    if runner.isHuman:
+                        self.say(
+                            f"{runner.name} is clean over hurdle {index + 1}!", hold=1.2
+                        )
+                    continue
+
+                runner.stumble()
+
+                if runner.isHuman:
+                    self.say(
+                        f"{runner.name} clips hurdle {index + 1} and stumbles!",
+                        force=True,
+                    )
                 else:
-                    runner.stumble()
                     self.say(f"{runner.name} smashes into a hurdle!")
 
     def checkLead(self):
@@ -746,17 +676,21 @@ class TurtleSprintGame(arcade.Window):
 
         if leader is not self.leader and leader.x > START_X + 30:
             self.leader = leader
-            if leader.isPlayer:
-                self.say("Toby hits the front!")
-            else:
-                self.say(f"{leader.name} takes the lead!")
+            self.say(f"{leader.name} takes the lead!")
 
     def checkFinish(self):
         for runner in self.runners:
             if runner.finishTime is None and runner.x >= FINISH_X:
                 runner.finishTime = self.raceTime
 
-        if self.player.finishTime is not None:
+                if runner.isHuman:
+                    self.say(
+                        f"{runner.name} crosses in {runner.finishTime:.2f} s!",
+                        force=True,
+                    )
+
+        # The race is over once both humans are home
+        if all(runner.finishTime is not None for runner in self.humans):
             self.finishRace()
 
     def finishRace(self):
@@ -778,41 +712,50 @@ class TurtleSprintGame(arcade.Window):
 
         standings.sort(key=lambda entry: entry[0])
 
-        self.results = []
         for place, (finishTime, runner) in enumerate(standings, start=1):
             runner.place = place
             runner.setState("idle")
-            self.results.append((place, runner.name, finishTime, runner.color))
 
-            marker = ">" if runner.isPlayer else " "
             placeText, nameText, timeText = self.resultRows[place - 1]
-            placeText.text = f"{marker} {place}"
+            placeText.text = f"{runner.label} {place}"
             nameText.text = runner.name
             timeText.text = f"{finishTime:5.2f} s"
 
             for text in (placeText, nameText, timeText):
                 text.color = runner.color
 
-        playerTime = self.player.finishTime
+        # Head to head: the human with the lower time wins the duel
+        winner = min(self.humans, key=lambda runner: runner.finishTime)
+        loser = max(self.humans, key=lambda runner: runner.finishTime)
+        gap = loser.finishTime - winner.finishTime
 
-        if self.bestTime is None or playerTime < self.bestTime:
-            self.bestTime = playerTime
+        self.resultWinner.text = (
+            f"{winner.label} WINS - {winner.name} by {gap:.2f} s"
+        )
+        self.resultWinner.color = winner.color
+
+        if self.bestTime is None or winner.finishTime < self.bestTime:
+            self.bestTime = winner.finishTime
             self.newRecord = True
-            saveBestTime(playerTime)
+            saveBestTime(winner.finishTime)
 
         if self.newRecord:
-            self.resultFooter.text = "NEW PERSONAL BEST!"
+            self.resultFooter.text = "NEW TRACK RECORD!    Press R to race again"
             self.resultFooter.color = (235, 200, 60)
         else:
             self.resultFooter.text = "Press R to race again"
             self.resultFooter.color = arcade.color.WHITE
 
-        if self.player.place == 1:
-            self.say("TOBY TAKES IT! The stadium erupts!", force=True)
+        if winner.place == 1:
+            self.say(
+                f"{winner.name} takes it, and beats the AI too! The stadium erupts!",
+                force=True,
+            )
             self.spawnConfetti()
         else:
             self.say(
-                f"Toby is beaten into {ordinal(self.player.place)}. Press R for a rematch.",
+                f"{winner.name} wins the duel but only finished "
+                f"{ordinal(winner.place)} overall.",
                 force=True,
             )
 
@@ -843,19 +786,25 @@ class TurtleSprintGame(arcade.Window):
     # ----- drawing --------------------------------------------------------------------
     def updateHud(self):
         self.timeText.text = f"{self.raceTime:5.2f} s"
-        self.distanceText.text = f"{self.player.metres:5.1f} / {RACE_DISTANCE} m"
 
-        if self.player.place is not None:
-            place = self.player.place
-        else:
-            # Mid-race the position is simply how many turtles are further down the track
-            place = sum(1 for runner in self.runners if runner.x > self.player.x) + 1
-        self.placeText.text = f"{ordinal(place)} of {LANE_COUNT}"
+        for index, runner in enumerate(self.humans):
+            if runner.place is not None:
+                place = runner.place
+            else:
+                # Mid-race the position is simply how many turtles are further
+                # down the track
+                place = sum(1 for other in self.runners if other.x > runner.x) + 1
+
+            self.playerTexts[index].text = (
+                f"{runner.label} {runner.name:9s}"
+                f"{runner.metres:5.1f} / {RACE_DISTANCE} m   "
+                f"{ordinal(place)} of {LANE_COUNT}"
+            )
 
         if self.bestTime is None:
-            self.bestText.text = "Best: --.--  (first race)"
+            self.bestText.text = "Track record: --.--  (first race)"
         else:
-            self.bestText.text = f"Best: {self.bestTime:.2f} s"
+            self.bestText.text = f"Track record: {self.bestTime:.2f} s"
 
     def on_draw(self):
         self.clear()
@@ -891,6 +840,10 @@ class TurtleSprintGame(arcade.Window):
 
             arcade.draw_line(START_X, bottom, START_X, top, arcade.color.WHITE, 2)
             self.laneTexts[lane].draw()
+
+            # A human lane gets a coloured tab, so each player can find their own
+            if runner.isHuman:
+                arcade.draw_lrbt_rectangle_filled(0, 8, bottom, top, runner.color)
 
             for hurdleX in self.hurdleXs:
                 self.drawHurdle(hurdleX, groundY)
@@ -928,30 +881,36 @@ class TurtleSprintGame(arcade.Window):
             row += 1
 
     def drawHud(self):
-        # Top bar
+        # Top bar, tall enough for one row per player
         arcade.draw_lrbt_rectangle_filled(
-            0, SCREEN_WIDTH, 540, SCREEN_HEIGHT, (28, 36, 48)
+            0, SCREEN_WIDTH, HUD_BOTTOM, SCREEN_HEIGHT, (28, 36, 48)
         )
         self.timeText.draw()
-        self.distanceText.draw()
-        self.placeText.draw()
         self.bestText.draw()
 
-        # Stamina bar
-        barLeft, barRight, barBottom, barTop = 560, 780, 550, 566
-        arcade.draw_lrbt_rectangle_filled(
-            barLeft, barRight, barBottom, barTop, (60, 70, 84)
-        )
-        fill = barLeft + (barRight - barLeft) * (self.stamina / MAX_STAMINA)
-        color = (235, 200, 60) if self.stamina > 1.0 else (225, 90, 70)
-        if fill > barLeft:
-            arcade.draw_lrbt_rectangle_filled(barLeft, fill, barBottom, barTop, color)
-        self.staminaText.draw()
+        for index, runner in enumerate(self.humans):
+            self.playerTexts[index].draw()
+            self.staminaLabels[index].draw()
+            self.drawStaminaBar(runner, 570 - index * 26)
 
         # Bottom commentary bar
         arcade.draw_lrbt_rectangle_filled(0, SCREEN_WIDTH, 0, 58, (28, 36, 48))
         self.narrativeText.draw()
         self.helpText.draw()
+
+    def drawStaminaBar(self, runner, bottom):
+        barLeft, barRight = 590, 784
+        top = bottom + 15
+
+        arcade.draw_lrbt_rectangle_filled(
+            barLeft, barRight, bottom, top, (60, 70, 84)
+        )
+
+        fill = barLeft + (barRight - barLeft) * (runner.stamina / MAX_STAMINA)
+        color = runner.color if runner.stamina > 1.0 else (225, 90, 70)
+
+        if fill > barLeft:
+            arcade.draw_lrbt_rectangle_filled(barLeft, fill, bottom, top, color)
 
     def drawConfetti(self):
         for piece in self.confetti:
@@ -964,7 +923,7 @@ class TurtleSprintGame(arcade.Window):
             )
 
     def drawResults(self):
-        left, right, bottom, top = 230, 570, 175, 425
+        left, right, bottom, top = 210, 590, 155, 415
         arcade.draw_lrbt_rectangle_filled(left, right, bottom, top, (28, 36, 48, 235))
         arcade.draw_lrbt_rectangle_outline(left, right, bottom, top, (235, 200, 60), 3)
 
@@ -975,23 +934,12 @@ class TurtleSprintGame(arcade.Window):
             nameText.draw()
             timeText.draw()
 
+        self.resultWinner.draw()
         self.resultFooter.draw()
 
 
 def main():
-    mode = sys.argv[1] if len(sys.argv) > 1 else "ex"
-
-    if mode == "1":
-        task1()
-        return
-
-    if mode == "2":
-        Task2Window()
-    elif mode == "3":
-        Task3Window()
-    else:
-        TurtleSprintGame()
-
+    TurtleSprintGame()
     arcade.run()
 
 
