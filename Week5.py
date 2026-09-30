@@ -20,9 +20,6 @@ frameDuration = 0.12
 targetCount = 15
 playerSpeed = 5
 
-# Collect every treasure before this many seconds to win
-timeLimit = 10.0
-
 praiseWords = [
     "OUHHHHHH!",
     "OHHHHHHH!",
@@ -70,9 +67,6 @@ class CaptureGame(arcade.Window):
 
         # Game timer (counts up in seconds)
         self.gameTime = 0
-
-        # "playing", "win" or "lose"
-        self.gameState = "playing"
 
     def setup(self):
         # Cut the sprite sheet into a grid of textures, one per frame
@@ -132,33 +126,24 @@ class CaptureGame(arcade.Window):
         self.praiseMessage = ""
         self.praiseTimer = 0
         self.gameTime = 0
-        self.gameState = "playing"
 
     def on_draw(self):
         self.clear(arcade.color.DARK_BLUE)
 
         arcade.draw_text(
-            f"Score: {self.score} / {targetCount}",
+            f"Score: {self.score}",
             20,
             screenHeight - 40,
             arcade.color.YELLOW,
             20
         )
 
-        # Timer on the top right of the screen, counting down to the limit
-        timeLeft = max(0, timeLimit - self.gameTime)
-
-        # Turn the clock red in the last 3 seconds
-        if timeLeft <= 3:
-            timeColor = arcade.color.RED
-        else:
-            timeColor = arcade.color.YELLOW
-
+        # Timer on the top right of the screen
         arcade.draw_text(
-            f"Time: {timeLeft:.1f}s",
+            f"Time: {self.gameTime:.1f}s",
             screenWidth - 20,
             screenHeight - 40,
-            timeColor,
+            arcade.color.YELLOW,
             20,
             anchor_x="right"
         )
@@ -197,46 +182,6 @@ class CaptureGame(arcade.Window):
                 anchor_x="center"
             )
 
-        # Win or lose message once the game is over
-        if self.gameState != "playing":
-
-            if self.gameState == "win":
-                message = "YOU WIN!"
-                detail = f"All {targetCount} treasures in {self.gameTime:.1f}s"
-                messageColor = arcade.color.GREEN
-            else:
-                message = "YOU LOSE!"
-                detail = f"Time is up - only {self.score} of {targetCount}"
-                messageColor = arcade.color.RED
-
-            arcade.draw_text(
-                message,
-                screenWidth / 2,
-                screenHeight / 2 + 30,
-                messageColor,
-                60,
-                anchor_x="center",
-                bold=True
-            )
-
-            arcade.draw_text(
-                detail,
-                screenWidth / 2,
-                screenHeight / 2 - 20,
-                arcade.color.WHITE,
-                22,
-                anchor_x="center"
-            )
-
-            arcade.draw_text(
-                "Press R to play again",
-                screenWidth / 2,
-                screenHeight / 2 - 60,
-                arcade.color.WHITE,
-                18,
-                anchor_x="center"
-            )
-
     def animatePlayer(self, deltaTime, isMoving):
         # Standing still: hold the first frame
         if not isMoving:
@@ -260,10 +205,6 @@ class CaptureGame(arcade.Window):
             self.playerSprite.texture = self.leftFrames[self.currentFrame]
 
     def on_update(self, deltaTime):
-        # The game is over, so nothing moves and the clock stops
-        if self.gameState != "playing":
-            return
-
         # Timer keeps counting while the game is running
         self.gameTime += deltaTime
 
@@ -338,22 +279,7 @@ class CaptureGame(arcade.Window):
             # Display for 2 seconds
             self.praiseTimer = 2.0
 
-        # Every treasure taken before the limit is a win
-        if self.score >= targetCount:
-            self.gameState = "win"
-
-        # Still treasures left when the time runs out is a loss
-        elif self.gameTime >= timeLimit:
-            self.gameState = "lose"
-            self.praiseMessage = ""
-            self.praiseTimer = 0
-
     def on_key_press(self, key, modifiers):
-        # R starts a new game once this one is over
-        if key == arcade.key.R and self.gameState != "playing":
-            self.setup()
-            return
-
         if key == arcade.key.UP or key == arcade.key.W:
             self.moveUp = True
 
