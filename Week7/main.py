@@ -6,9 +6,9 @@ import member3
 
 screenWidth = 800
 screenHeight = 600
-screenTitle = "Image Manipulation"
+screenTitle = "Image Changer"
 
-initialScale = 0.5
+initialScale = 00.5
 
 
 class myWindowApp(arcade.Window):
