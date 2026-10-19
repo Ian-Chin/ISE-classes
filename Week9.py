@@ -425,14 +425,12 @@ class generativeSmokeView(arcade.View):
 
         self.ui_manager.draw()
 
-# ---------------- Fire ----------------
 
 FIRE_EMISSION_RATE = 90
 FIRE_SOURCE_X = SCREEN_WIDTH // 2
 FIRE_SOURCE_Y = 80
 FIRE_BASE_WIDTH = 70
 
-# Fire color goes from white-yellow at the core to red, then dark smoke.
 FIRE_COLORS = [
     (0.00, (255, 250, 200)),
     (0.20, (255, 210, 60)),
@@ -454,7 +452,6 @@ def fireColor(progress):
 
 class FireParticle:
     def __init__(self, x, y):
-        # Particles near the center of the base live longer, giving a flame shape.
         offset = random.gauss(0, FIRE_BASE_WIDTH / 4)
         self.x = x + offset
         self.y = y + random.uniform(-3, 3)
@@ -473,7 +470,6 @@ class FireParticle:
     def update(self, dt):
         self.age += dt
 
-        # Hot air accelerates upward.
         self.vy += 40 * dt
         self.y += self.vy * dt
 
@@ -490,8 +486,17 @@ class FireParticle:
         alpha = int(110 * (1.0 - progress) ** 1.2)
 
         if alpha > 0:
-            arcade.draw_circle_filled(self.x, self.y, radius * 1.6, (r, g, b, alpha // 4))
-            arcade.draw_circle_filled(self.x, self.y, radius, (r, g, b, alpha))
+            self.drawTriangle(radius * 1.6, (r, g, b, alpha // 4))
+            self.drawTriangle(radius, (r, g, b, alpha))
+
+    def drawTriangle(self, size, color):
+        # Upward-pointing triangle centred on the particle.
+        arcade.draw_triangle_filled(
+            self.x, self.y + size,
+            self.x - size * 0.866, self.y - size * 0.5,
+            self.x + size * 0.866, self.y - size * 0.5,
+            color,
+        )
 
     @property
     def is_dead(self):
@@ -609,7 +614,6 @@ class SnowView(arcade.View):
 
         self.flakes = [Snowflake(start_on_screen=True) for _ in range(SNOWFLAKE_COUNT)]
 
-        # Height of the snow pile in each ground column.
         self.ground = [0.0] * SNOW_GROUND_COLUMNS
         self.time = 0.0
 
@@ -631,7 +635,6 @@ class SnowView(arcade.View):
     def on_update(self, dt):
         self.time += dt
 
-        # Gentle gusts of wind.
         wind = math.sin(self.time * 0.3) * 30
 
         column_width = SCREEN_WIDTH / SNOW_GROUND_COLUMNS
@@ -641,13 +644,11 @@ class SnowView(arcade.View):
 
             column = min(int(flake.x / column_width), SNOW_GROUND_COLUMNS - 1)
 
-            # Flake lands on the snow pile.
             if flake.y <= self.ground[column]:
                 if self.ground[column] < SNOW_MAX_HEIGHT:
                     self.ground[column] += flake.size * 1.0
                 flake.reset()
 
-        # Smooth the pile so it does not form spikes.
         smoothed = self.ground[:]
         for i in range(1, SNOW_GROUND_COLUMNS - 1):
             smoothed[i] = self.ground[i] * 0.9 + (self.ground[i - 1] + self.ground[i + 1]) * 0.05
@@ -659,7 +660,6 @@ class SnowView(arcade.View):
         for flake in self.flakes:
             flake.draw()
 
-        # Snow pile on the ground.
         column_width = SCREEN_WIDTH / SNOW_GROUND_COLUMNS
         points = [(0, 0)]
         for i, height in enumerate(self.ground):
@@ -678,7 +678,6 @@ class SnowView(arcade.View):
 
         self.ui_manager.draw()
 
-# ---------------- Firework ----------------
 
 GRAVITY = 120
 FIREWORK_COLORS = [
@@ -752,7 +751,6 @@ class Rocket:
         self.x += self.vx * dt
         self.y += self.vy * dt
 
-        # Small sparks trailing behind the rocket.
         sparks.append(
             Spark(
                 self.x, self.y,
@@ -770,7 +768,6 @@ class Rocket:
         count = random.randint(70, 110)
         speed = random.uniform(160, 240)
 
-        # Some fireworks have a second color.
         second_color = random.choice(FIREWORK_COLORS)
 
         for i in range(count):
